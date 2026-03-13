@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+data/raw/*.csv
+data/cleaned/*.csv
+reports/*.json
+reports/*.html
+.DS_Store
