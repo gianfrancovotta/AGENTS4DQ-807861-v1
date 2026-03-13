@@ -7,7 +7,7 @@ REPLY × LUISS Machine Learning Project | A.A. 2025/26
 - Armando Fornario (813811)
 
 **Captain:**
-- Gianfranco Votta
+- Gianfranco Votta (807861)
 
 ## Section 1 — Introduction
 
