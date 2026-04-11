@@ -78,6 +78,7 @@ class ConsistencyValidator:
             "**Data Redundancy Alerts:**\n"
             "- [Column A] and [Column B] appear to contain identical information.\n\n"
             "If NO logical violations or rules are found, return ONLY: 'No logical violations detected in sample.'"
+            "If you do mention any specific rows in the report, make sure to remind the user that those specific rows are just examples and that the issues may be present in other rows as well."
         )
         message = self.model.invoke(prompt)
         return message.content

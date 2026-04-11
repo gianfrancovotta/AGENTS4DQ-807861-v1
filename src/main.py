@@ -1,8 +1,10 @@
 import streamlit as st
 import json
 import pandas as pd
+import os
 
 from data_orchestrator import DataOrchestrator
+from remediator import RemediatorAgent
 from schema_validator import SchemaValidator
 from completeness_analyst import CompletenessAnalyst
 from consistency_validator import ConsistencyValidator
@@ -26,9 +28,16 @@ validator = SchemaValidator()
 completeness_analyst = CompletenessAnalyst()
 consistency_validator = ConsistencyValidator()
 anomaly_detector = AnomalyDetector()
+remediator = RemediatorAgent()
 
 def main():
     df = None
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(current_dir)
+    logo_path = os.path.join(project_root, "images", "Logo_Reply.png")
+    st.image(logo_path, width=200)
+
     file_to_check = st.file_uploader("Upload a CSV to begin")
 
     with st.form("my_form"):
@@ -133,11 +142,15 @@ def main():
 
                 st.write_stream(stream_text(consistency_validator_output))
                 st.write_stream(stream_text("**Note: I've automatically removed the exact duplicates found in the dataset. Refer to the report above for details on how many duplicates were found and if any key columns were affected.**"))
+                st.write_stream(stream_text("**Note 2: The row completeness analysis and the cross column logic checks have been performed after dropping the columns that were flagged as potentially droppable in the completeness analysis step, however those columns are still present in the downloadable dataset.**"))
+                st.write_stream(stream_text("**This is to allow for manual review before finalizing the dataset, and to avoid dropping columns that may be actually useful for analysis just because they have a high percentage of missing values.**"))
                 st.write("---")
 
                 st.write_stream(stream_text("## Executing: Step 4, Anomaly detection"))
-                outlier_report = anomaly_detector.univariate_outlier_detection(pattern_report_str, df, file_to_check)
-                cat_outlier_report = anomaly_detector.categorical_outlier_detection(pattern_report_str, df, file_to_check)
+                outlier_report = anomaly_detector.univariate_outlier_detection(pattern_report_str, df, file_to_check)[0]
+                outlier_report_file = anomaly_detector.univariate_outlier_detection(pattern_report_str, df, file_to_check)[1]
+                cat_outlier_report = anomaly_detector.categorical_outlier_detection(pattern_report_str, df, file_to_check, outlier_report_file)[0]
+                outlier_report_file = anomaly_detector.categorical_outlier_detection(pattern_report_str, df, file_to_check, outlier_report_file)[1]
 
                 parts = ["### Univariate Outlier Detection Results:",
                 outlier_report.strip(),
@@ -149,7 +162,30 @@ def main():
 
                 st.write_stream(stream_text(anomaly_detector_output))
                 st.write("---")
-                df.to_csv("cleaned_data.csv", index=False)
+                st.write_stream(stream_text("## Executing: Step 5, Final Remediation Report"))
+                remediation_report = remediator.generate_remediation_report(completeness_analyst_output_message, consistency_validator_output, anomaly_detector_output, file_to_check)
+                remediation_report = Outputs(remediation_report).get_text()
+                st.write_stream(stream_text(remediation_report))
+                st.write("---")
+                csv_bytes = df.to_csv(index=False).encode('utf-8')
+                return [[csv_bytes, outlier_report_file], file_to_check.name]
+
+def download_files(downloads):
+    st.download_button(
+        label="Download Cleaned Data",
+        data=downloads[0][0],
+        file_name=f"{downloads[1]}_cleaned_data.csv",
+        mime="text/csv"
+    )
+    if downloads[0][1] is not None:
+        st.download_button(
+            label="Download Outlier Report",
+            data=downloads[0][1],
+            file_name=f"{downloads[1]}_outlier_report.txt",
+            mime="text/plain"
+        )
                 
 if __name__ == "__main__":
-    main()
+    downloads = main()
+    if downloads is not None:
+        download_files(downloads)

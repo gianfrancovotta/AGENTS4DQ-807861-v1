@@ -23,13 +23,13 @@ class AnomalyDetector:
             )
         message = self.model.invoke(prompt)
         univariate_columns = Outputs(message.content).get_json_obj()
-        
+        report_to_disk = None
         report = ""
         if len(univariate_columns) == 0:
             report += "No columns were found as candidates for univariate outliers detection.\n"
         else:
             for col in univariate_columns:
-                series = pd.to_numeric(df[col], errors='coerce').dropna()
+                series = pd.to_numeric(df[col], errors='coerce').dropna() #A failsafe, in case there were hallucinations when trying to cast the column into a number in the schema validation step. This makes sure that only values that can be cast into a number are considered for the univariate outlier detection, and all the other values are ignored.
                 if series.empty:
                     continue
                 mean_val = series.mean()
@@ -42,14 +42,26 @@ class AnomalyDetector:
                     report += f"Column '{col}': No outliers detected.\n\n"
                 else:
                     report += f"Column '{col}': Found {len(outlier_data)} outliers.\n"
-                    report += f"Details: {outlier_data.to_dict()}\n\n"
-            
+                    if len(outlier_data) < 10:
+                        report += f"Details: {outlier_data.to_dict()}\n\n"
+                    if len(outlier_data) >= 10 and not report_to_disk:
+                        report += f"Details: Too many outliers to display (more than 10), check the final txt report for more details.\n\n"
+                        report_to_disk = "Univariate outliers: \n\n"
+                        report_to_disk += f"Column '{col}': Found {len(outlier_data)} outliers.\n"
+                        report_to_disk += f"Details: {outlier_data.to_dict()}\n\n"
+                    elif len(outlier_data) >= 10 and report_to_disk:
+                        report += f"Details: Too many outliers to display (more than 10), check the final txt report for more details.\n\n"
+                        report_to_disk += f"Column '{col}': Found {len(outlier_data)} outliers.\n"
+                        report_to_disk += f"Details: {outlier_data.to_dict()}\n\n"
+
             report += "Remember that this analysis is done only on values that could be converted into a number. Refer to the report for the list of rows and values that cannot be cast into a number.\n"
             report += "All the values that couldn't be cast have been ignored."
-            
-        return report
+        if report_to_disk is not None:
+            return [report, report_to_disk]
+        else:
+            return [report, None]
     
-    def categorical_outlier_detection(self, pattern_report, df, file_to_check):
+    def categorical_outlier_detection(self, pattern_report, df, file_to_check, outlier_report_file):
         prompt = (
             f"Context: {file_to_check.name}\n"
             f"This is a sample of the dataframe you are working on: {df.head()}"
@@ -62,8 +74,9 @@ class AnomalyDetector:
             )
         message = self.model.invoke(prompt)
         categorical_columns = Outputs(message.content).get_json_obj()
-        
+        report_to_disk = outlier_report_file
         report = ""
+        first_iteration = False
         if len(categorical_columns) == 0:
             report += "No columns were found as candidates for categorical outliers detection.\n"
         else:
@@ -78,5 +91,22 @@ class AnomalyDetector:
                     report += f"Column '{col}': No outliers detected.\n\n"
                 else:
                     report += f"Column '{col}': Found {len(outlier_data)} outliers.\n"
-                    report += f"Details: {outlier_data.to_dict()}\n\n"
-        return report
+                    if len(outlier_data) < 10:
+                        report += f"Details: {outlier_data.to_dict()}\n\n"
+                    if len(outlier_data) >= 10 and not report_to_disk:
+                        report += f"Details: Too many outliers to display (more than 10), check the final txt report for more details.\n\n"
+                        report_to_disk = f"Categorical outliers: \n\n"
+                        report_to_disk += f"Column '{col}': Found {len(outlier_data)} outliers.\n"
+                        report_to_disk += f"Details: {outlier_data.to_dict()}\n\n"
+                    elif len(outlier_data) >= 10 and report_to_disk:
+                        report += f"Details: Too many outliers to display (more than 10), check the final txt report for more details.\n\n"
+                        if not first_iteration:
+                             report_to_disk += f"Categorical outliers: \n\n"
+                             first_iteration = True
+                        report_to_disk += f"Column '{col}': Found {len(outlier_data)} outliers.\n"
+                        report_to_disk += f"Details: {outlier_data.to_dict()}\n\n"
+
+        if report_to_disk is not None:
+            return [report, report_to_disk]
+        else:
+            return [report, None]

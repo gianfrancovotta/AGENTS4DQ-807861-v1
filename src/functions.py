@@ -5,7 +5,7 @@ import time
  
 def get_dataframe_patterns(df):
     def get_shape(value):
-        if value is pd.NA or pd.isna(value) or value is None:  # fixed: pd.NA must be checked first, before pd.isna()
+        if value is pd.NA or pd.isna(value) or value is None:  
             return "NULL"
         s = str(value)
         s = re.sub(r'[a-zA-Z]+', 'W', s)
