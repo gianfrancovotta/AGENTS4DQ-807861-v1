@@ -11,4 +11,4 @@ AGENTS-FOR-DATA-QUALITY/
 tests.py
 shit.md
 cleaned_data.csv
-
+*.db
