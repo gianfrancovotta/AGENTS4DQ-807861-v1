@@ -44,15 +44,19 @@ class CompletenessAnalyst:
         return message.content
     
     def summarize_rows(self, schema, to_drop, file_to_check):
+        total_rows = len(schema)
+        rows_above_50 = len(to_drop)
+        pct_above_50 = rows_above_50 / total_rows if total_rows > 0 else 0
+        sample_rows = to_drop[:20]
+
         prompt = (
-            f"Context: {file_to_check.name}"
-            "The user gave a .csv that has been analysed for completeness\n"
-            f"This is the schema of the missing value percentages of all the rows: {schema}\n"
-            f"This is a list of all the rows where the percentage of missing values is above 50%, after dropping the columns with more than 50% of missing values: {to_drop}\n"
-            f"This is the percentage of rows that have more than 50% of missing values: {len(to_drop)/len(schema):.2%}\n"
-            "Task: Summarise the findings of the analysis in a human readable way. Keep it in a singular section.\n"
-            "This is the format to follow for the output, make sure to number the section as number 4:\n"
-            "4: Row completeness summary: Give a brief summary of the completeness analysis of the rows in the dataset, including the percentage of rows that have more than 50% missing values and list the rows that have more than 50% missing values.\n"
+            f"Context: {file_to_check.name}\n"
+            f"Total rows: {total_rows}\n"
+            f"Rows with >50% missing values: {rows_above_50} ({pct_above_50:.2%})\n"
+            f"Sample of problematic row indices (up to 20): {sample_rows}\n"
+            "Task: Summarise the findings in a human readable way.\n"
+            "4: Row completeness summary: Give a brief summary including the percentage "
+            "of rows with more than 50% missing values.\n"
         )
         message = self.model.invoke(prompt)
         return message.content
